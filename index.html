@@ -51,13 +51,27 @@ button:hover {
   font-size: 16px;
   font-weight: bold;
 }
+
+#bookingsList {
+  margin-top: 30px;
+  text-align: left;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+  border-top: 1px solid #ccc;
+  padding-top: 20px;
+}
+
+.booking-item {
+  margin-bottom: 10px;
+  border-bottom: 1px dashed #ccc;
+  padding-bottom: 10px;
+}
 </style>
 </head>
-
 <body>
 
 <h2>Select Booking Dates & Time</h2>
-
 <input type="text" id="datePicker" placeholder="Select Date Range">
 
 <div class="times" id="timeSlots"></div>
@@ -65,6 +79,9 @@ button:hover {
 <div id="summary"></div>
 
 <button id="confirm">Confirm Booking</button>
+
+<h3>All Bookings</h3>
+<div id="bookingsList"></div>
 
 <script>
 const times = [
@@ -79,11 +96,12 @@ const HOURLY_RATE = DAILY_RATE / 24;
 const timeContainer = document.getElementById("timeSlots");
 const confirmBtn = document.getElementById("confirm");
 const summary = document.getElementById("summary");
+const bookingsList = document.getElementById("bookingsList");
 
 let selectedTime = null;
 let selectedDates = [];
 
-// Convert time string to hours
+// Convert time string to 24-hour number
 function parseTime(timeStr) {
   const [time, modifier] = timeStr.split(" ");
   let [hours] = time.split(":");
@@ -108,11 +126,54 @@ times.forEach(time => {
   timeContainer.appendChild(btn);
 });
 
-// Flatpickr date range picker
-flatpickr("#datePicker", {
+// Load bookings from LocalStorage
+function loadBookings() {
+  const savedBookings = JSON.parse(localStorage.getItem("bookings") || "[]");
+  bookingsList.innerHTML = "";
+  if (savedBookings.length === 0) {
+    bookingsList.innerHTML = "<i>No bookings yet</i>";
+    return;
+  }
+
+  savedBookings.forEach((b, idx) => {
+    const div = document.createElement("div");
+    div.classList.add("booking-item");
+    div.innerHTML = `
+      <strong>Booking #${idx + 1}</strong><br>
+      Start: ${b.start}<br>
+      End: ${b.end}<br>
+      Time: ${b.time}<br>
+      Hours: ${b.hours}<br>
+      Base Cost: ₱${b.baseCost}<br>
+      Late Hours: ${b.lateHours}<br>
+      Penalty: ₱${b.penalty}<br>
+      Total: ₱${b.total}
+    `;
+    bookingsList.appendChild(div);
+  });
+}
+
+// Get all booked dates as strings for Flatpickr
+function getBookedDates() {
+  const bookings = JSON.parse(localStorage.getItem("bookings") || "[]");
+  const disabledDates = [];
+  bookings.forEach(b => {
+    let start = new Date(b.start);
+    let end = new Date(b.end);
+    while (start <= end) {
+      disabledDates.push(start.toISOString().split("T")[0]);
+      start.setDate(start.getDate() + 1);
+    }
+  });
+  return disabledDates;
+}
+
+// Initialize Flatpickr
+const fp = flatpickr("#datePicker", {
   mode: "range",
   minDate: "today",
   dateFormat: "Y-m-d",
+  disable: getBookedDates(),
   onChange: function(dates) {
     selectedDates = dates;
     updateSummary();
@@ -161,20 +222,34 @@ confirmBtn.onclick = () => {
   const penalty = lateHours * HOURLY_RATE;
   const finalTotal = totalCost + penalty;
 
-  alert(`Booking confirmed:
-Start: ${start}
-End: ${end}
+  // Save booking in LocalStorage
+  const bookings = JSON.parse(localStorage.getItem("bookings") || "[]");
+  bookings.push({
+    start: start.toString(),
+    end: end.toString(),
+    time: selectedTime,
+    hours: hours,
+    baseCost: totalCost.toFixed(2),
+    lateHours: lateHours,
+    penalty: penalty.toFixed(2),
+    total: finalTotal.toFixed(2)
+  });
+  localStorage.setItem("bookings", JSON.stringify(bookings));
 
-Booked Hours: ${hours}
-Base Cost: ₱${totalCost.toFixed(2)}
+  alert(`Booking confirmed!\nTotal: ₱${finalTotal.toFixed(2)}`);
 
-Late Hours: ${lateHours}
-Penalty: ₱${penalty.toFixed(2)}
-
-Final Total: ₱${finalTotal.toFixed(2)}
-`);
+  // Reload bookings and update Flatpickr disabled dates
+  loadBookings();
+  fp.set("disable", getBookedDates());
+  fp.clear();
+  summary.innerHTML = "";
+  selectedTime = null;
+  document.querySelectorAll(".times button").forEach(b => b.classList.remove("selected"));
+  confirmBtn.style.display = "none";
 };
-</script>
 
+// Load bookings on page load
+loadBookings();
+</script>
 </body>
 </html>
