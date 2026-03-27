@@ -2,11 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Booking Calendar</title>
+<title>Camera Booking</title>
 
 <!-- Flatpickr -->
-<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
 <style>
 body {
@@ -45,6 +45,12 @@ button:hover {
   padding: 12px 20px;
   display: none;
 }
+
+#summary {
+  margin-top: 20px;
+  font-size: 16px;
+  font-weight: bold;
+}
 </style>
 </head>
 
@@ -56,20 +62,38 @@ button:hover {
 
 <div class="times" id="timeSlots"></div>
 
+<div id="summary"></div>
+
 <button id="confirm">Confirm Booking</button>
 
 <script>
 const times = [
-  "8:00 AM", "9:00 AM", "10:00 AM",
-  "11:00 AM", "12:00 PM", "1:00 PM",
-  "2:00 PM", "3:00 PM", "4:00 PM"
+  "8:00 AM","9:00 AM","10:00 AM",
+  "11:00 AM","12:00 PM","1:00 PM",
+  "2:00 PM","3:00 PM","4:00 PM"
 ];
+
+const DAILY_RATE = 500;
+const HOURLY_RATE = DAILY_RATE / 24;
 
 const timeContainer = document.getElementById("timeSlots");
 const confirmBtn = document.getElementById("confirm");
+const summary = document.getElementById("summary");
 
 let selectedTime = null;
 let selectedDates = [];
+
+// Convert time string to hours
+function parseTime(timeStr) {
+  const [time, modifier] = timeStr.split(" ");
+  let [hours] = time.split(":");
+  hours = parseInt(hours);
+
+  if (modifier === "PM" && hours !== 12) hours += 12;
+  if (modifier === "AM" && hours === 12) hours = 0;
+
+  return hours;
+}
 
 // Create time buttons
 times.forEach(time => {
@@ -78,20 +102,15 @@ times.forEach(time => {
 
   btn.onclick = () => {
     document.querySelectorAll(".times button").forEach(b => b.classList.remove("selected"));
-
     btn.classList.add("selected");
     selectedTime = time;
-
-    // Show confirm only if both date range + time selected
-    if (selectedDates.length === 2) {
-      confirmBtn.style.display = "block";
-    }
+    updateSummary();
   };
 
   timeContainer.appendChild(btn);
 });
 
-// Flatpickr (Range Mode)
+// Flatpickr
 flatpickr("#datePicker", {
   mode: "range",
   minDate: "today",
@@ -99,33 +118,74 @@ flatpickr("#datePicker", {
 
   onChange: function(dates) {
     selectedDates = dates;
-
-    if (selectedDates.length === 2 && selectedTime) {
-      confirmBtn.style.display = "block";
-    } else {
-      confirmBtn.style.display = "none";
-    }
+    updateSummary();
   }
 });
 
+// Calculate and show summary
+function updateSummary() {
+  if (selectedDates.length === 2 && selectedTime) {
+    const start = new Date(selectedDates[0]);
+    const end = new Date(selectedDates[1]);
+
+    const hour = parseTime(selectedTime);
+
+    start.setHours(hour);
+    end.setHours(hour);
+
+    const diffTime = end - start;
+    const hours = diffTime / (1000 * 60 * 60);
+
+    const totalCost = hours * HOURLY_RATE;
+
+    summary.innerHTML = `
+      Duration: ${hours} hours<br>
+      Rate: ₱${HOURLY_RATE.toFixed(2)}/hour<br>
+      Total: ₱${totalCost.toFixed(2)}
+    `;
+
+    confirmBtn.style.display = "block";
+  } else {
+    summary.innerHTML = "";
+    confirmBtn.style.display = "none";
+  }
+}
+
 // Confirm booking
 confirmBtn.onclick = () => {
-  if (selectedDates.length !== 2 || !selectedTime) {
-    alert("Please select a date range and time");
-    return;
+  const start = new Date(selectedDates[0]);
+  const end = new Date(selectedDates[1]);
+
+  const hour = parseTime(selectedTime);
+  start.setHours(hour);
+  end.setHours(hour);
+
+  const diffTime = end - start;
+  const hours = diffTime / (1000 * 60 * 60);
+  const totalCost = hours * HOURLY_RATE;
+
+  // Ask for actual return time (simulate late return)
+  const lateHours = prompt("Enter late return hours (0 if none):", "0");
+
+  let penalty = 0;
+  if (lateHours && lateHours > 0) {
+    penalty = lateHours * HOURLY_RATE;
   }
 
-  const start = selectedDates[0];
-  const end = selectedDates[1];
-
-  const diffTime = Math.abs(end - start);
-  const days = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+  const finalTotal = totalCost + penalty;
 
   alert(`Booking confirmed:
-Start: ${start.toDateString()}
-End: ${end.toDateString()}
-Time: ${selectedTime}
-Duration: ${days} day(s)`);
+Start: ${start}
+End: ${end}
+
+Booked Hours: ${hours}
+Base Cost: ₱${totalCost.toFixed(2)}
+
+Late Hours: ${lateHours}
+Penalty: ₱${penalty.toFixed(2)}
+
+Final Total: ₱${finalTotal.toFixed(2)}
+`);
 };
 </script>
 
