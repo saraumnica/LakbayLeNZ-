@@ -88,10 +88,8 @@ function parseTime(timeStr) {
   const [time, modifier] = timeStr.split(" ");
   let [hours] = time.split(":");
   hours = parseInt(hours);
-
   if (modifier === "PM" && hours !== 12) hours += 12;
   if (modifier === "AM" && hours === 12) hours = 0;
-
   return hours;
 }
 
@@ -110,32 +108,28 @@ times.forEach(time => {
   timeContainer.appendChild(btn);
 });
 
-// Flatpickr
+// Flatpickr date range picker
 flatpickr("#datePicker", {
   mode: "range",
   minDate: "today",
   dateFormat: "Y-m-d",
-
   onChange: function(dates) {
     selectedDates = dates;
     updateSummary();
   }
 });
 
-// Calculate and show summary
+// Update summary and price
 function updateSummary() {
   if (selectedDates.length === 2 && selectedTime) {
     const start = new Date(selectedDates[0]);
     const end = new Date(selectedDates[1]);
-
     const hour = parseTime(selectedTime);
-
     start.setHours(hour);
     end.setHours(hour);
 
     const diffTime = end - start;
     const hours = diffTime / (1000 * 60 * 60);
-
     const totalCost = hours * HOURLY_RATE;
 
     summary.innerHTML = `
@@ -155,7 +149,6 @@ function updateSummary() {
 confirmBtn.onclick = () => {
   const start = new Date(selectedDates[0]);
   const end = new Date(selectedDates[1]);
-
   const hour = parseTime(selectedTime);
   start.setHours(hour);
   end.setHours(hour);
@@ -164,14 +157,8 @@ confirmBtn.onclick = () => {
   const hours = diffTime / (1000 * 60 * 60);
   const totalCost = hours * HOURLY_RATE;
 
-  // Ask for actual return time (simulate late return)
-  const lateHours = prompt("Enter late return hours (0 if none):", "0");
-
-  let penalty = 0;
-  if (lateHours && lateHours > 0) {
-    penalty = lateHours * HOURLY_RATE;
-  }
-
+  const lateHours = parseFloat(prompt("Enter late return hours (0 if none):", "0")) || 0;
+  const penalty = lateHours * HOURLY_RATE;
   const finalTotal = totalCost + penalty;
 
   alert(`Booking confirmed:
